@@ -284,7 +284,8 @@ export default function App() {
 
     setContractors(matched)
     setSelectedId(matched[0].id)
-  }  const handleExportPdf = () => {
+  }
+    const handleExportPdf = () => {
     const doc = new jsPDF()
     const top = enrichedContractors[0]
 
@@ -600,7 +601,8 @@ export default function App() {
               </ResponsiveContainer>
             </div>
           </div>
-        </section>        <section className="chart-grid">
+        </section>
+                <section className="chart-grid">
           <div className="panel">
             <div className="panel-header">
               <h3>Xu hướng hiệu quả dự án</h3>
