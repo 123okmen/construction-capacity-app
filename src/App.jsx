@@ -1,1 +1,407 @@
-[{"insert":"import React, { useMemo, useState } from \"react\";\nimport {\n  RadarChart,\n  PolarGrid,\n  PolarAngleAxis,\n  PolarRadiusAxis,\n  Radar,\n  ResponsiveContainer,\n  BarChart,\n  Bar,\n  XAxis,\n  YAxis,\n  Tooltip,\n  CartesianGrid,\n  Legend\n} from \"recharts\";\nimport {\n  Building2,\n  ClipboardCheck,\n  FileText,\n  Download,\n  Trophy,\n  AlertTriangle,\n  CheckCircle2\n} from \"lucide-react\";\n\nconst enterpriseCriteria = [\n  { key: \"governance\", label: \"Quản trị điều hành\" },\n  { key: \"finance\", label: \"Tài chính\" },\n  { key: \"technical\", label: \"Kỹ thuật thi công\" },\n  { key: \"digital\", label: \"Công nghệ số\" },\n  { key: \"hrSafety\", label: \"Nhân sự & an toàn\" }\n];\n\nconst contractorCriteria = [\n  { key: \"A1\", label: \"A1. Kinh nghiệm công trình tương tự\" },\n  { key: \"A2\", label: \"A2. Năng lực nhân sự chủ chốt\" },\n  { key: \"A3\", label: \"A3. Thiết bị & máy móc thi công\" },\n  { key: \"A4\", label: \"A4. Biện pháp thi công & tiến độ\" },\n  { key: \"A5\", label: \"A5. Hệ thống an toàn & chất lượng\" },\n  { key: \"B1\", label: \"B1. Năng lực tài chính\" },\n  { key: \"B2\", label: \"B2. Giá chào thầu\" },\n  { key: \"B3\", label: \"B3. Điều kiện thanh toán & bảo lãnh\" },\n  { key: \"C1\", label: \"C1. Hồ sơ pháp lý & tuân thủ\" },\n  { key: \"C2\", label: \"C2. Uy tín & lịch sử thực hiện\" },\n  { key: \"C3\", label: \"C3. Khả năng phối hợp & phản hồi\" }\n];\n\nconst defaultEnterprise = {\n  governance: 72,\n  finance: 68,\n  technical: 80,\n  digital: 55,\n  hrSafety: 77\n};\n\nconst defaultContractors = [\n  {\n    name: \"Nhà thầu phụ A\",\n    scores: { A1: 85, A2: 78, A3: 80, A4: 82, A5: 88, B1: 72, B2: 76, B3: 70, C1: 90, C2: 84, C3: 82 }\n  },\n  {\n    name: \"Nhà thầu phụ B\",\n    scores: { A1: 76, A2: 82, A3: 74, A4: 79, A5: 80, B1: 85, B2: 88, B3: 84, C1: 86, C2: 80, C3: 78 }\n  },\n  {\n    name: \"Nhà thầu phụ C\",\n    scores: { A1: 90, A2: 86, A3: 88, A4: 87, A5: 92, B1: 70, B2: 68, B3: 72, C1: 91, C2: 89, C3: 88 }\n  }\n];\n\nfunction clamp(val) {\n  const n = Number(val);\n  if (Number.isNaN(n)) return 0;\n  return Math.max(0, Math.min(100, n));\n}\n\nfunction getEnterpriseLevel(score) {\n  if (score >= 85) return { label: \"Xuất sắc\", color: \"green\" };\n  if (score >= 70) return { label: \"Khá\", color: \"blue\" };\n  if (score >= 50) return { label: \"Trung bình\", color: \"orange\" };\n  return { label: \"Cần cải thiện\", color: \"red\" };\n}\n\nfunction getContractorDecision(score) {\n  if (score >= 85) return \"Ưu tiên lựa chọn\";\n  if (score >= 75) return \"Đạt yêu cầu\";\n  if (score >= 60) return \"Cân nhắc thêm\";\n  return \"Không khuyến nghị\";\n}\n\nfunction groupScores(scores) {\n  const groupA = (scores.A1 + scores.A2 + scores.A3 + scores.A4 + scores.A5) / 5;\n  const groupB = (scores.B1 + scores.B2 + scores.B3) / 3;\n  const groupC = (scores.C1 + scores.C2 + scores.C3) / 3;\n  const total = groupA * 0.5 + groupB * 0.3 + groupC * 0.2;\n  return { groupA, groupB, groupC, total };\n}\n\nexport default function App() {\n  const [tab, setTab] = useState(\"enterprise\");\n  const [enterprise, setEnterprise] = useState(defaultEnterprise);\n  const [contractors, setContractors] = useState(defaultContractors);\n\n  const enterpriseResult = useMemo(() => {\n    const values = Object.values(enterprise);\n    const avg = values.reduce((a, b) => a + b, 0) / values.length;\n    const minKey = Object.keys(enterprise).reduce((min, key) =>\n      enterprise[key] < enterprise[min] ? key : min\n    );\n    const weakest = enterpriseCriteria.find((c) => c.key === minKey)?.label || \"\";\n    return {\n      cci: avg,\n      level: getEnterpriseLevel(avg),\n      weakest\n    };\n  }, [enterprise]);\n\n  const rankedContractors = useMemo(() => {\n    return contractors\n      .map((c) => {\n        const grouped = groupScores(c.scores);\n        return { ...c, ...grouped, decision: getContractorDecision(grouped.total) };\n      })\n      .sort((a, b) => b.total - a.total);\n  }, [contractors]);\n\n  const topContractor = rankedContractors[0];\n\n  const radarData = enterpriseCriteria.map((item) => ({\n    subject: item.label,\n    value: enterprise[item.key]\n  }));\n\n  const barData = rankedContractors.map((c) => ({\n    name: c.name,\n    \"Nhóm A\": Number(c.groupA.toFixed(1)),\n    \"Nhóm B\": Number(c.groupB.toFixed(1)),\n    \"Nhóm C\": Number(c.groupC.toFixed(1)),\n    \"Tổng điểm\": Number(c.total.toFixed(1))\n  }));\n\n  const handleEnterpriseChange = (key, value) => {\n    setEnterprise((prev) => ({ ...prev, [key]: clamp(value) }));\n  };\n\n  const handleContractorChange = (index, key, value) => {\n    setContractors((prev) => {\n      const next = [...prev];\n      next[index] = {\n        ...next[index],\n        scores: {\n          ...next[index].scores,\n          [key]: clamp(value)\n        }\n      };\n      return next;\n    });\n  };\n\n  const exportPdf = () => {\n    window.print();\n  };\n\n  return (\n    <div className=\"app-shell\">\n      <header className=\"hero\">\n        <div>\n          <h1>Ứng dụng đánh giá năng lực & lựa chọn nhà thầu phụ</h1>\n          <p>\n            Dành cho doanh nghiệp nhỏ trong lĩnh vực xây dựng – tích hợp khung đánh giá năng lực nội bộ\n            và bộ tiêu chí hỗ trợ lựa chọn nhà thầu phụ theo định hướng NCKH.\n          </p>\n        </div>\n        <button className=\"print-btn\" onClick={exportPdf}>\n          <Download size={18} />\n          Xuất báo cáo PDF\n        </button>\n      </header>\n\n      <section className=\"summary-grid\">\n        <div className=\"summary-card\">\n          <div className=\"icon blue\"><Building2 size={18} /></div>\n          <div>\n            <span>Chỉ số năng lực tổng hợp (CCI)</span>\n            <strong>{enterpriseResult.cci.toFixed(1)}</strong>\n          </div>\n        </div>\n        <div className=\"summary-card\">\n          <div className=\"icon gold\"><Trophy size={18} /></div>\n          <div>\n            <span>Nhà thầu phụ xếp hạng #1</span>\n            <strong>{topContractor?.name || \"-\"}</strong>\n          </div>\n        </div>\n        <div className=\"summary-card\">\n          <div className=\"icon green\"><CheckCircle2 size={18} /></div>\n          <div>\n            <span>Mức đánh giá doanh nghiệp</span>\n            <strong>{enterpriseResult.level.label}</strong>\n          </div>\n        </div>\n        <div className=\"summary-card\">\n          <div className=\"icon orange\"><AlertTriangle size={18} /></div>\n          <div>\n            <span>Điểm yếu cần ưu tiên</span>\n            <strong>{enterpriseResult.weakest}</strong>\n          </div>\n        </div>\n      </section>\n\n      <nav className=\"tabs\">\n        <button className={tab === \"enterprise\" ? \"active\" : \"\"} onClick={() => setTab(\"enterprise\")}>\n          <Building2 size={16} /> Đánh giá doanh nghiệp\n        </button>\n        <button className={tab === \"contractor\" ? \"active\" : \"\"} onClick={() => setTab(\"contractor\")}>\n          <ClipboardCheck size={16} /> Chọn nhà thầu phụ\n        </button>\n        <button className={tab === \"report\" ? \"active\" : \"\"} onClick={() => setTab(\"report\")}>\n          <FileText size={16} /> Báo cáo tổng hợp\n        </button>\n      </nav>\n\n      {tab === \"enterprise\" && (\n        <section className=\"panel-grid\">\n          <div className=\"card\">\n            <h2>1. Đánh giá năng lực doanh nghiệp xây dựng</h2>\n            <p className=\"muted\">Nhập điểm từng nhóm tiêu chí (0–100).</p>\n            <div className=\"form-grid\">\n              {enterpriseCriteria.map((item) => (\n                <label key={item.key} className=\"field\">\n                  <span>{item.label}</span>\n                  <input\n                    type=\"number\"\n                    min=\"0\"\n                    max=\"100\"\n                    value={enterprise[item.key]}\n                    onChange={(e) => handleEnterpriseChange(item.key, e.target.value)}\n                  />\n                </label>\n              ))}\n            </div>\n\n            <div className=\"result-box\">\n              <div><strong>CCI:</strong> {enterpriseResult.cci.toFixed(1)}</div>\n              <div><strong>Xếp loại:</strong> {enterpriseResult.level.label}</div>\n              <div><strong>Nhóm yếu nhất:</strong> {enterpriseResult.weakest}</div>\n              <div>\n                <strong>Khuyến nghị:</strong>{\" \"}\n                {enterpriseResult.weakest === \"Công nghệ số\"\n                  ? \"Ưu tiên đầu tư số hóa hồ sơ, theo dõi tiến độ và quản lý dữ liệu thi công.\"\n                  : enterpriseResult.weakest === \"Tài chính\"\n                  ? \"Củng cố dòng tiền, kiểm soát công nợ và tăng minh bạch tài chính.\"\n                  : enterpriseResult.weakest === \"Quản trị điều hành\"\n                  ? \"Chuẩn hóa quy trình điều hành, phân quyền và KPI nội bộ.\"\n                  : enterpriseResult.weakest === \"Kỹ thuật thi công\"\n                  ? \"Nâng cấp năng lực tổ chức thi công, thiết bị và kiểm soát chất lượng.\"\n                  : \"Tăng cường đào tạo, an toàn lao động và phát triển nhân sự chủ chốt.\"}\n              </div>\n            </div>\n          </div>\n\n          <div className=\"card chart-card\">\n            <h2>Biểu đồ radar năng lực</h2>\n            <div className=\"chart-wrap\">\n              <ResponsiveContainer width=\"100%\" height={360}>\n                <RadarChart data={radarData}>\n                  <PolarGrid />\n                  <PolarAngleAxis dataKey=\"subject\" />\n                  <PolarRadiusAxis domain={[0, 100]} />\n                  <Radar dataKey=\"value\" fillOpacity={0.5} />\n                </RadarChart>\n              </ResponsiveContainer>\n            </div>\n          </div>\n        </section>\n      )}\n\n      {tab === \"contractor\" && (\n        <section className=\"stack\">\n          <div className=\"card\">\n            <h2>2. Khung đánh giá lựa chọn nhà thầu phụ</h2>\n            <p className=\"muted\">\n              Bộ tiêu chí chia 3 nhóm: A (Kỹ thuật – năng lực thực hiện), B (Tài chính – thương mại),\n              C (Pháp lý – phối hợp). Điểm tổng hợp = A×50% + B×30% + C×20%.\n            </p>\n          </div>\n\n          {contractors.map((contractor, idx) => (\n            <div className=\"card\" key={contractor.name}>\n              <h3>{contractor.name}</h3>\n              <div className=\"contractor-grid\">\n                {contractorCriteria.map((item) => (\n                  <label key={item.key} className=\"field small\">\n                    <span>{item.label}</span>\n                    <input\n                      type=\"number\"\n                      min=\"0\"\n                      max=\"100\"\n                      value={contractor.scores[item.key]}\n                      onChange={(e) => handleContractorChange(idx, item.key, e.target.value)}\n                    />\n                  </label>\n                ))}\n              </div>\n            </div>\n          ))}\n\n          <div className=\"panel-grid\">\n            <div className=\"card\">\n              <h2>Bảng xếp hạng nhà thầu phụ</h2>\n              <div className=\"table-wrap\">\n                <table>\n                  <thead>\n                    <tr>\n                      <th>Hạng</th>\n                      <th>Nhà thầu</th>\n                      <th>Nhóm A</th>\n                      <th>Nhóm B</th>\n                      <th>Nhóm C</th>\n                      <th>Tổng điểm</th>\n                      <th>Kết luận</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {rankedContractors.map((c, index) => (\n                      <tr key={c.name}>\n                        <td>#{index + 1}</td>\n                        <td>{c.name}</td>\n                        <td>{c.groupA.toFixed(1)}</td>\n                        <td>{c.groupB.toFixed(1)}</td>\n                        <td>{c.groupC.toFixed(1)}</td>\n                        <td><strong>{c.total.toFixed(1)}</strong></td>\n                        <td>{c.decision}</td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </div>\n\n            <div className=\"card chart-card\">\n              <h2>Biểu đồ so sánh nhà thầu</h2>\n              <div className=\"chart-wrap\">\n                <ResponsiveContainer width=\"100%\" height={360}>\n                  <BarChart data={barData}>\n                    <CartesianGrid strokeDasharray=\"3 3\" />\n                    <XAxis dataKey=\"name\" />\n                    <YAxis domain={[0, 100]} />\n                    <Tooltip />\n                    <Legend />\n                    <Bar dataKey=\"Nhóm A\" />\n                    <Bar dataKey=\"Nhóm B\" />\n                    <Bar dataKey=\"Nhóm C\" />\n                    <Bar dataKey=\"Tổng điểm\" />\n                  </BarChart>\n                </ResponsiveContainer>\n              </div>\n            </div>\n          </div>\n        </section>\n      )}\n\n      {tab === \"report\" && (\n        <section className=\"panel-grid\">\n          <div className=\"card\">\n            <h2>3. Báo cáo tổng hợp cho doanh nghiệp</h2>\n            <div className=\"report-block\">\n              <h3>Kết quả đánh giá năng lực doanh nghiệp</h3>\n              <ul>\n                <li>CCI tổng hợp: <strong>{enterpriseResult.cci.toFixed(1)}</strong></li>\n                <li>Xếp loại hiện tại: <strong>{enterpriseResult.level.label}</strong></li>\n                <li>Nhóm cần ưu tiên cải thiện: <strong>{enterpriseResult.weakest}</strong></li>\n              </ul>\n\n              <h3>Kết quả lựa chọn nhà thầu phụ</h3>\n              <ul>\n                <li>Nhà thầu xếp hạng cao nhất: <strong>{topContractor?.name}</strong></li>\n                <li>Tổng điểm: <strong>{topContractor?.total.toFixed(1)}</strong></li>\n                <li>Kết luận: <strong>{topContractor?.decision}</strong></li>\n              </ul>\n\n              <h3>Khuyến nghị quản trị</h3>\n              <ol>\n                <li>Ưu tiên chọn nhà thầu có điểm Nhóm A cao để đảm bảo năng lực thực thi thực tế.</li>\n                <li>Không chỉ dựa vào giá thấp, cần cân bằng giữa kỹ thuật – tài chính – pháp lý.</li>\n                <li>Sử dụng app định kỳ theo quý để cập nhật năng lực doanh nghiệp và danh sách đối tác.</li>\n                <li>Tích hợp kết quả này vào quy trình ra quyết định nội bộ và hồ sơ NCKH/demo.</li>\n              </ol>\n            </div>\n          </div>\n\n          <div className=\"card\">\n            <h2>Hướng dẫn xuất PDF</h2>\n            <p className=\"muted\">\n              Nhấn nút <strong>“Xuất báo cáo PDF”</strong> ở góc trên phải → cửa sổ in mở ra →\n              chọn <strong>Save as PDF</strong> để lưu báo cáo.\n            </p>\n            <div className=\"note\">\n              Mẹo: Trước khi lưu PDF, chuyển sang tab <strong>Báo cáo tổng hợp</strong> để nội dung xuất ra đẹp nhất.\n            </div>\n          </div>\n        </section>\n      )}\n    </div>\n  );\n}\n"}]
+import React, { useMemo, useState } from "react";
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend
+} from "recharts";
+import {
+  Building2,
+  ClipboardCheck,
+  FileText,
+  Download,
+  Trophy,
+  AlertTriangle,
+  CheckCircle2
+} from "lucide-react";
+
+const enterpriseCriteria = [
+  { key: "governance", label: "Quản trị điều hành" },
+  { key: "finance", label: "Tài chính" },
+  { key: "technical", label: "Kỹ thuật thi công" },
+  { key: "digital", label: "Công nghệ số" },
+  { key: "hrSafety", label: "Nhân sự & an toàn" }
+];
+
+const contractorCriteria = [
+  { key: "A1", label: "A1. Kinh nghiệm công trình tương tự" },
+  { key: "A2", label: "A2. Năng lực nhân sự chủ chốt" },
+  { key: "A3", label: "A3. Thiết bị & máy móc thi công" },
+  { key: "A4", label: "A4. Biện pháp thi công & tiến độ" },
+  { key: "A5", label: "A5. Hệ thống an toàn & chất lượng" },
+  { key: "B1", label: "B1. Năng lực tài chính" },
+  { key: "B2", label: "B2. Giá chào thầu" },
+  { key: "B3", label: "B3. Điều kiện thanh toán & bảo lãnh" },
+  { key: "C1", label: "C1. Hồ sơ pháp lý & tuân thủ" },
+  { key: "C2", label: "C2. Uy tín & lịch sử thực hiện" },
+  { key: "C3", label: "C3. Khả năng phối hợp & phản hồi" }
+];
+
+const defaultEnterprise = {
+  governance: 72,
+  finance: 68,
+  technical: 80,
+  digital: 55,
+  hrSafety: 77
+};
+
+const defaultContractors = [
+  {
+    name: "Nhà thầu phụ A",
+    scores: { A1: 85, A2: 78, A3: 80, A4: 82, A5: 88, B1: 72, B2: 76, B3: 70, C1: 90, C2: 84, C3: 82 }
+  },
+  {
+    name: "Nhà thầu phụ B",
+    scores: { A1: 76, A2: 82, A3: 74, A4: 79, A5: 80, B1: 85, B2: 88, B3: 84, C1: 86, C2: 80, C3: 78 }
+  },
+  {
+    name: "Nhà thầu phụ C",
+    scores: { A1: 90, A2: 86, A3: 88, A4: 87, A5: 92, B1: 70, B2: 68, B3: 72, C1: 91, C2: 89, C3: 88 }
+  }
+];
+
+function clamp(val) {
+  const n = Number(val);
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
+function getEnterpriseLevel(score) {
+  if (score >= 85) return { label: "Xuất sắc", color: "green" };
+  if (score >= 70) return { label: "Khá", color: "blue" };
+  if (score >= 50) return { label: "Trung bình", color: "orange" };
+  return { label: "Cần cải thiện", color: "red" };
+}
+
+function getContractorDecision(score) {
+  if (score >= 85) return "Ưu tiên lựa chọn";
+  if (score >= 75) return "Đạt yêu cầu";
+  if (score >= 60) return "Cân nhắc thêm";
+  return "Không khuyến nghị";
+}
+
+function groupScores(scores) {
+  const groupA = (scores.A1 + scores.A2 + scores.A3 + scores.A4 + scores.A5) / 5;
+  const groupB = (scores.B1 + scores.B2 + scores.B3) / 3;
+  const groupC = (scores.C1 + scores.C2 + scores.C3) / 3;
+  const total = groupA * 0.5 + groupB * 0.3 + groupC * 0.2;
+  return { groupA, groupB, groupC, total };
+}
+
+export default function App() {
+  const [tab, setTab] = useState("enterprise");
+  const [enterprise, setEnterprise] = useState(defaultEnterprise);
+  const [contractors, setContractors] = useState(defaultContractors);
+
+  const enterpriseResult = useMemo(() => {
+    const values = Object.values(enterprise);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const minKey = Object.keys(enterprise).reduce((min, key) =>
+      enterprise[key] < enterprise[min] ? key : min
+    );
+    const weakest = enterpriseCriteria.find((c) => c.key === minKey)?.label || "";
+    return {
+      cci: avg,
+      level: getEnterpriseLevel(avg),
+      weakest
+    };
+  }, [enterprise]);
+
+  const rankedContractors = useMemo(() => {
+    return contractors
+      .map((c) => {
+        const grouped = groupScores(c.scores);
+        return { ...c, ...grouped, decision: getContractorDecision(grouped.total) };
+      })
+      .sort((a, b) => b.total - a.total);
+  }, [contractors]);
+
+  const topContractor = rankedContractors[0];
+
+  const radarData = enterpriseCriteria.map((item) => ({
+    subject: item.label,
+    value: enterprise[item.key]
+  }));
+
+  const barData = rankedContractors.map((c) => ({
+    name: c.name,
+    "Nhóm A": Number(c.groupA.toFixed(1)),
+    "Nhóm B": Number(c.groupB.toFixed(1)),
+    "Nhóm C": Number(c.groupC.toFixed(1)),
+    "Tổng điểm": Number(c.total.toFixed(1))
+  }));
+
+  const handleEnterpriseChange = (key, value) => {
+    setEnterprise((prev) => ({ ...prev, [key]: clamp(value) }));
+  };
+
+  const handleContractorChange = (index, key, value) => {
+    setContractors((prev) => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        scores: {
+          ...next[index].scores,
+          [key]: clamp(value)
+        }
+      };
+      return next;
+    });
+  };
+
+  const exportPdf = () => {
+    window.print();
+  };
+
+  return (
+    <div className="app-shell">
+      <header className="hero">
+        <div>
+          <h1>Ứng dụng đánh giá năng lực & lựa chọn nhà thầu phụ</h1>
+          <p>
+            Dành cho doanh nghiệp nhỏ trong lĩnh vực xây dựng – tích hợp khung đánh giá năng lực nội bộ
+            và bộ tiêu chí hỗ trợ lựa chọn nhà thầu phụ theo định hướng NCKH.
+          </p>
+        </div>
+        <button className="print-btn" onClick={exportPdf}>
+          <Download size={18} />
+          Xuất báo cáo PDF
+        </button>
+      </header>
+
+      <section className="summary-grid">
+        <div className="summary-card">
+          <div className="icon blue"><Building2 size={18} /></div>
+          <div>
+            <span>Chỉ số năng lực tổng hợp (CCI)</span>
+            <strong>{enterpriseResult.cci.toFixed(1)}</strong>
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="icon gold"><Trophy size={18} /></div>
+          <div>
+            <span>Nhà thầu phụ xếp hạng #1</span>
+            <strong>{topContractor?.name || "-"}</strong>
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="icon green"><CheckCircle2 size={18} /></div>
+          <div>
+            <span>Mức đánh giá doanh nghiệp</span>
+            <strong>{enterpriseResult.level.label}</strong>
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="icon orange"><AlertTriangle size={18} /></div>
+          <div>
+            <span>Điểm yếu cần ưu tiên</span>
+            <strong>{enterpriseResult.weakest}</strong>
+          </div>
+        </div>
+      </section>
+
+      <nav className="tabs">
+        <button className={tab === "enterprise" ? "active" : ""} onClick={() => setTab("enterprise")}>
+          <Building2 size={16} /> Đánh giá doanh nghiệp
+        </button>
+        <button className={tab === "contractor" ? "active" : ""} onClick={() => setTab("contractor")}>
+          <ClipboardCheck size={16} /> Chọn nhà thầu phụ
+        </button>
+        <button className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>
+          <FileText size={16} /> Báo cáo tổng hợp
+        </button>
+      </nav>
+
+      {tab === "enterprise" && (
+        <section className="panel-grid">
+          <div className="card">
+            <h2>1. Đánh giá năng lực doanh nghiệp xây dựng</h2>
+            <p className="muted">Nhập điểm từng nhóm tiêu chí (0–100).</p>
+            <div className="form-grid">
+              {enterpriseCriteria.map((item) => (
+                <label key={item.key} className="field">
+                  <span>{item.label}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={enterprise[item.key]}
+                    onChange={(e) => handleEnterpriseChange(item.key, e.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="result-box">
+              <div><strong>CCI:</strong> {enterpriseResult.cci.toFixed(1)}</div>
+              <div><strong>Xếp loại:</strong> {enterpriseResult.level.label}</div>
+              <div><strong>Nhóm yếu nhất:</strong> {enterpriseResult.weakest}</div>
+              <div>
+                <strong>Khuyến nghị:</strong>{" "}
+                {enterpriseResult.weakest === "Công nghệ số"
+                  ? "Ưu tiên đầu tư số hóa hồ sơ, theo dõi tiến độ và quản lý dữ liệu thi công."
+                  : enterpriseResult.weakest === "Tài chính"
+                  ? "Củng cố dòng tiền, kiểm soát công nợ và tăng minh bạch tài chính."
+                  : enterpriseResult.weakest === "Quản trị điều hành"
+                  ? "Chuẩn hóa quy trình điều hành, phân quyền và KPI nội bộ."
+                  : enterpriseResult.weakest === "Kỹ thuật thi công"
+                  ? "Nâng cấp năng lực tổ chức thi công, thiết bị và kiểm soát chất lượng."
+                  : "Tăng cường đào tạo, an toàn lao động và phát triển nhân sự chủ chốt."}
+              </div>
+            </div>
+          </div>
+
+          <div className="card chart-card">
+            <h2>Biểu đồ radar năng lực</h2>
+            <div className="chart-wrap">
+              <ResponsiveContainer width="100%" height={360}>
+                <RadarChart data={radarData}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="subject" />
+                  <PolarRadiusAxis domain={[0, 100]} />
+                  <Radar dataKey="value" fillOpacity={0.5} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === "contractor" && (
+        <section className="stack">
+          <div className="card">
+            <h2>2. Khung đánh giá lựa chọn nhà thầu phụ</h2>
+            <p className="muted">
+              Bộ tiêu chí chia 3 nhóm: A (Kỹ thuật – năng lực thực hiện), B (Tài chính – thương mại),
+              C (Pháp lý – phối hợp). Điểm tổng hợp = A×50% + B×30% + C×20%.
+            </p>
+          </div>
+
+          {contractors.map((contractor, idx) => (
+            <div className="card" key={contractor.name}>
+              <h3>{contractor.name}</h3>
+              <div className="contractor-grid">
+                {contractorCriteria.map((item) => (
+                  <label key={item.key} className="field small">
+                    <span>{item.label}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={contractor.scores[item.key]}
+                      onChange={(e) => handleContractorChange(idx, item.key, e.target.value)}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div className="panel-grid">
+            <div className="card">
+              <h2>Bảng xếp hạng nhà thầu phụ</h2>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Hạng</th>
+                      <th>Nhà thầu</th>
+                      <th>Nhóm A</th>
+                      <th>Nhóm B</th>
+                      <th>Nhóm C</th>
+                      <th>Tổng điểm</th>
+                      <th>Kết luận</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankedContractors.map((c, index) => (
+                      <tr key={c.name}>
+                        <td>#{index + 1}</td>
+                        <td>{c.name}</td>
+                        <td>{c.groupA.toFixed(1)}</td>
+                        <td>{c.groupB.toFixed(1)}</td>
+                        <td>{c.groupC.toFixed(1)}</td>
+                        <td><strong>{c.total.toFixed(1)}</strong></td>
+                        <td>{c.decision}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="card chart-card">
+              <h2>Biểu đồ so sánh nhà thầu</h2>
+              <div className="chart-wrap">
+                <ResponsiveContainer width="100%" height={360}>
+                  <BarChart data={barData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="Nhóm A" />
+                    <Bar dataKey="Nhóm B" />
+                    <Bar dataKey="Nhóm C" />
+                    <Bar dataKey="Tổng điểm" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === "report" && (
+        <section className="panel-grid">
+          <div className="card">
+            <h2>3. Báo cáo tổng hợp cho doanh nghiệp</h2>
+            <div className="report-block">
+              <h3>Kết quả đánh giá năng lực doanh nghiệp</h3>
+              <ul>
+                <li>CCI tổng hợp: <strong>{enterpriseResult.cci.toFixed(1)}</strong></li>
+                <li>Xếp loại hiện tại: <strong>{enterpriseResult.level.label}</strong></li>
+                <li>Nhóm cần ưu tiên cải thiện: <strong>{enterpriseResult.weakest}</strong></li>
+              </ul>
+
+              <h3>Kết quả lựa chọn nhà thầu phụ</h3>
+              <ul>
+                <li>Nhà thầu xếp hạng cao nhất: <strong>{topContractor?.name}</strong></li>
+                <li>Tổng điểm: <strong>{topContractor?.total.toFixed(1)}</strong></li>
+                <li>Kết luận: <strong>{topContractor?.decision}</strong></li>
+              </ul>
+
+              <h3>Khuyến nghị quản trị</h3>
+              <ol>
+                <li>Ưu tiên chọn nhà thầu có điểm Nhóm A cao để đảm bảo năng lực thực thi thực tế.</li>
+                <li>Không chỉ dựa vào giá thấp, cần cân bằng giữa kỹ thuật – tài chính – pháp lý.</li>
+                <li>Sử dụng app định kỳ theo quý để cập nhật năng lực doanh nghiệp và danh sách đối tác.</li>
+                <li>Tích hợp kết quả này vào quy trình ra quyết định nội bộ và hồ sơ NCKH/demo.</li>
+              </ol>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2>Hướng dẫn xuất PDF</h2>
+            <p className="muted">
+              Nhấn nút <strong>“Xuất báo cáo PDF”</strong> ở góc trên phải → cửa sổ in mở ra →
+              chọn <strong>Save as PDF</strong> để lưu báo cáo.
+            </p>
+            <div className="note">
+              Mẹo: Trước khi lưu PDF, chuyển sang tab <strong>Báo cáo tổng hợp</strong> để nội dung xuất ra đẹp nhất.
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
